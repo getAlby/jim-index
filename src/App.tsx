@@ -1,11 +1,55 @@
-import { NDKEvent } from "@nostr-dev-kit/ndk";
-import { useStore } from "./store";
+import { getRelayListForUsers, NDKEvent } from "@nostr-dev-kit/ndk";
+import { ndk, useStore } from "./store";
 import { JIM_INSTANCE_KIND } from "./types";
+import { ExternalLink, Router, ThumbsUp } from "lucide-react";
 
 export default function App() {
   const store = useStore();
 
+  async function login() {
+    return store.login();
+  }
+
+  async function _publishToRelays(event: NDKEvent) {
+    const user = await ndk.signer?.user();
+    if (!user) {
+      throw new Error("Could not fetch user");
+    }
+    const relayLists = await getRelayListForUsers([user.pubkey], ndk);
+    const relayList = relayLists.get(user.pubkey);
+
+    if (!relayList?.relays?.length) {
+      throw new Error("User has no relays");
+    }
+
+    if (
+      !confirm(
+        "Confirm publish event " +
+          JSON.stringify(event.rawEvent()) +
+          " to relays " +
+          relayList.relays.join(", "),
+      )
+    ) {
+      throw new Error("user cancelled");
+    }
+    const publishedRelays = await event.publish(
+      relayList.relaySet,
+      undefined,
+      1,
+    );
+    alert(
+      "Published to " +
+        Array.from(publishedRelays)
+          .map((relay) => relay.url)
+          .join(", "),
+    );
+  }
+
   async function addJim() {
+    if (!(await login())) {
+      alert("Failed to login");
+      return;
+    }
     const promptResponse = prompt("Enter your Jim URL");
     if (!promptResponse) {
       return;
@@ -17,47 +61,44 @@ export default function App() {
       if (jimUrl.endsWith("/")) {
         jimUrl = jimUrl.substring(0, jimUrl.length - 1);
       }
-      if (!confirm("Confirm publish new Jim: " + url)) {
-        return;
-      }
     } catch (error) {
       alert("Invalid URL: " + error);
       return;
     }
-    const event = new NDKEvent(store.ndk);
+    const event = new NDKEvent(ndk);
     event.kind = JIM_INSTANCE_KIND;
     event.dTag = jimUrl.toString();
 
     try {
-      const publishedRelays = await event.publish(undefined, undefined, 1);
-
-      alert(
-        "Published to " +
-          Array.from(publishedRelays)
-            .map((relay) => relay.url)
-            .join(", "),
-      );
+      await _publishToRelays(event);
     } catch (error) {
       alert("Publish failed: " + error);
     }
   }
 
   async function recommend(eventId: string) {
-    const event = new NDKEvent(store.ndk);
+    if (!(await login())) {
+      alert("Failed to login");
+      return;
+    }
+    const event = new NDKEvent(ndk);
     event.kind = 38000;
     event.tags.push(["k", JIM_INSTANCE_KIND.toString()]);
     event.dTag = eventId;
     try {
-      if (!confirm("Confirm publish recommendation for event " + eventId)) {
-        return;
-      }
-      const publishedRelays = await event.publish(undefined, undefined, 1);
-      alert(
-        "Published to " +
-          Array.from(publishedRelays)
-            .map((relay) => relay.url)
-            .join(", "),
-      );
+      await _publishToRelays(event);
+    } catch (error) {
+      alert("Publish failed: " + error);
+    }
+  }
+
+  async function republish(event: NDKEvent) {
+    if (!(await login())) {
+      alert("Failed to login");
+      return;
+    }
+    try {
+      await _publishToRelays(event);
     } catch (error) {
       alert("Publish failed: " + error);
     }
@@ -68,11 +109,16 @@ export default function App() {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <img src="/jim-index/jim-sm.png" className="w-12 h-12" />
-          Jim Index
+          <span className="font-semibold">Jim Index</span>
         </div>
         <div className="flex items-center justify-end gap-2">
           {!store.hasLoaded && (
             <span className="loading loading-spinner loading-md"></span>
+          )}
+          {!store.isLoggedIn && store.hasLoaded && (
+            <button onClick={login} className="btn btn-secondary">
+              Login
+            </button>
           )}
           <button onClick={addJim} className="btn btn-primary">
             Add Jim
@@ -90,7 +136,7 @@ export default function App() {
                     <img
                       src={
                         jim.info?.image ||
-                        `https://api.dicebear.com/9.x/pixel-art/svg?seed=${jim.url}`
+                        `https://api.dicebear.com/9.x/croodles-neutral/svg?seed=${jim.url}`
                       }
                     />
                   </div>
@@ -108,28 +154,54 @@ export default function App() {
               <p className="text-sm line-clamp-2" title={jim.info?.description}>
                 {jim.info?.description || "No description"}
               </p>
-              <p>
-                <a href={jim.url} target="_blank" className="link">
-                  {jim.url}
-                </a>
-              </p>
-              <p className="text-sm">
-                {jim.recommendedByUsers.length} recommendations (
-                {jim.recommendedByUsers.filter((r) => r.mutual).length} mutual)
-              </p>
+              {!store.isLoggedIn && (
+                <p className="text-xs">Login to see friend recommendations</p>
+              )}
+              {store.isLoggedIn && (
+                <div className="flex flex-wrap gap-2">
+                  {jim.recommendedByUsers.map((user) => (
+                    <div key={user.user.pubkey} className="avatar">
+                      <div className="w-8 rounded-lg">
+                        <img
+                          title={
+                            user.user.profile?.displayName ||
+                            user.user.profile?.name ||
+                            user.user.npub
+                          }
+                          src={
+                            user.user.profile?.image ||
+                            `https://api.dicebear.com/9.x/pixel-art/svg?seed=${user.user.pubkey}`
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="card-actions justify-end mt-2">
                 <a
                   href={jim.url}
                   target="_blank"
                   className="btn btn-primary btn-sm"
+                  title="Visit this Jim in a new tab"
                 >
-                  Launch
+                  <ExternalLink className="w-4" />
+                  Visit
                 </a>
                 <button
                   onClick={() => recommend(jim.eventId)}
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-secondary btn-sm flex gap-2 items-center justify-center"
+                  title="Recommend this relay"
                 >
-                  Recommend
+                  <ThumbsUp className="w-4" /> {jim.recommendedByUsers.length}
+                </button>
+                <button
+                  onClick={() => republish(jim.event)}
+                  className="btn btn-secondary btn-sm flex gap-2 items-center justify-center"
+                  title={`Published on ${jim.event.onRelays.length} relays (${jim.event.onRelays.map((relay) => relay.url).join(", ")})`}
+                >
+                  <Router className="w-4" /> {jim.event.onRelays.length}
                 </button>
               </div>
             </div>

@@ -1,5 +1,11 @@
 // Import the package
-import NDK, { NDKKind, NDKNip07Signer, NDKUser } from "@nostr-dev-kit/ndk";
+import NDK, {
+  NDKEvent,
+  NDKKind,
+  NDKNip07Signer,
+  NDKSigner,
+  NDKUser,
+} from "@nostr-dev-kit/ndk";
 import { create } from "zustand";
 import { JIM_INSTANCE_KIND } from "./types";
 
@@ -10,8 +16,7 @@ if (window.nostr) {
 
 // TODO: do not create signer on startup as it launches dialog
 // Create a new NDK instance with explicit relays
-const signer = new NDKNip07Signer();
-const ndk = new NDK({
+export const ndk = new NDK({
   // TODO: review relays
   explicitRelayUrls: [
     "wss://relay.damus.io",
@@ -23,12 +28,12 @@ const ndk = new NDK({
     "wss://nostr.stakey.net",
     "wss://relay.n057r.club",
   ],
-  signer,
 });
 
 type Jim = {
   url: string;
   eventId: string;
+  event: NDKEvent;
   recommendedByUsers: { user: NDKUser; mutual: boolean }[];
   info?: {
     name?: string;
@@ -38,24 +43,44 @@ type Jim = {
 };
 
 type Store = {
-  readonly ndk: NDK;
   readonly jims: Jim[];
+  readonly isLoggedIn: boolean;
   readonly hasLoaded: boolean;
   setJims(jims: Jim[]): void;
   setLoaded(hasLoaded: boolean): void;
+  login(): Promise<boolean>;
 };
 
-export const useStore = create<Store>((set) => ({
-  ndk,
+export const useStore = create<Store>((set, get) => ({
+  isLoggedIn: false,
   jims: [],
   hasLoaded: false,
   setJims: (jims) => set({ jims }),
   setLoaded: (hasLoaded) => set({ hasLoaded }),
+  login: async () => {
+    if (get().isLoggedIn || !get().hasLoaded) {
+      return get().isLoggedIn;
+    }
+    set({ hasLoaded: false });
+    const signer = new NDKNip07Signer();
+    ndk.signer = signer;
+    await loadJims();
+    await loadMutualRecommendations(signer);
+    set({
+      isLoggedIn: true,
+      hasLoaded: true,
+    });
+    return true;
+  },
 }));
 
 (async () => {
   await ndk.connect();
+  await loadJims();
+  useStore.getState().setLoaded(true);
+})();
 
+async function loadJims() {
   const jimInstanceEvents = await ndk.fetchEvents({
     kinds: [JIM_INSTANCE_KIND as NDKKind],
   });
@@ -65,10 +90,23 @@ export const useStore = create<Store>((set) => ({
   for (const event of jimInstanceEvents) {
     const url = event.dTag;
     if (url && !url.endsWith("/")) {
+      let info: Jim["info"];
+      try {
+        const response = await fetch(new URL("/api/info", url));
+        if (response.ok) {
+          info = await response.json();
+        }
+      } catch (error) {
+        console.error("failed to fetch jim info", url, error);
+        continue;
+      }
+
       jims.push({
         eventId: event.id,
         url,
         recommendedByUsers: [],
+        event,
+        info,
       });
     }
   }
@@ -85,7 +123,6 @@ export const useStore = create<Store>((set) => ({
   for (const recommendationEvent of jimRecommendationEvents) {
     const jim = jims.find((j) => j.eventId === recommendationEvent.dTag);
     if (jim) {
-      // TODO: save pubkeys
       jim.recommendedByUsers.push({
         user: recommendationEvent.author,
         mutual: false,
@@ -93,23 +130,9 @@ export const useStore = create<Store>((set) => ({
     }
   }
   useStore.getState().setJims(jims);
+}
 
-  // fetch jim info
-  for (const jim of jims) {
-    try {
-      const response = await fetch(new URL("/api/info", jim.url));
-      if (response.ok) {
-        jim.info = await response.json();
-      }
-    } catch (error) {
-      console.error("failed to fetch jim info", jim.url, error);
-    }
-  }
-
-  useStore.getState().setJims(jims);
-
-  // mutual recommendations
-
+async function loadMutualRecommendations(signer: NDKSigner) {
   console.log("fetching user...");
   const user = await signer.user();
   console.log("user", user);
@@ -118,10 +141,12 @@ export const useStore = create<Store>((set) => ({
   const followsPubkeys = [...Array.from(follows), user].map(
     (follow) => follow.pubkey,
   );
+  const jims = useStore.getState().jims;
   for (const jim of jims) {
     for (const recommendedByUser of jim.recommendedByUsers) {
       if (followsPubkeys.includes(recommendedByUser.user.pubkey)) {
         recommendedByUser.mutual = true;
+        await recommendedByUser.user.fetchProfile();
       }
     }
   }
@@ -130,4 +155,4 @@ export const useStore = create<Store>((set) => ({
   // TODO: sort jims
 
   useStore.getState().setLoaded(true);
-})();
+}

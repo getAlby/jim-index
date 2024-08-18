@@ -2,7 +2,7 @@
 
 An index of [Alby Jim](https://github.com/getAlby/jim) instances that have been published on Nostr relays. Choose a Jim and get a 1-click wallet!
 
-[Try it now](https://getAlby.gethub.io/jim-index)
+[Try it now](https://getalby.github.io/jim-index/)
 
 ## Jim Event
 

@@ -1,7 +1,15 @@
 import { getRelayListForUsers, NDKEvent } from "@nostr-dev-kit/ndk";
 import { ndk, useStore } from "./store";
 import { JIM_INSTANCE_KIND } from "./types";
-import { ExternalLink, Router, ThumbsUp } from "lucide-react";
+import {
+  Bitcoin,
+  ExternalLink,
+  MicVocal,
+  Router,
+  SearchX,
+  ThumbsUp,
+  Wallet,
+} from "lucide-react";
 import React from "react";
 
 export default function App() {
@@ -111,7 +119,7 @@ export default function App() {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <img src="/jim-index/jim-sm.png" className="w-12 h-12" />
-          <span className="font-semibold">Jim Index</span>
+          <span className="font-semibold">Uncle Jim Index</span>
         </div>
         <div className="flex items-center justify-end gap-2">
           {!store.hasLoaded && (
@@ -160,32 +168,56 @@ export default function App() {
                   <div className="w-12 rounded-lg">
                     <img
                       src={
-                        jim.info?.image ||
+                        jim.info.image ||
                         `https://api.dicebear.com/9.x/croodles-neutral/svg?seed=${jim.url}`
                       }
                     />
                   </div>
                 </div>
-                <h2 className="card-title line-clamp-1">
-                  <a
-                    href={jim.url}
-                    target="_blank"
-                    className="w-full font-semibold line-clamp-1"
-                  >
-                    {jim.info?.name || "Unknown Jim"}
-                  </a>
-                </h2>
+                <div>
+                  <h2 className="card-title line-clamp-1">
+                    <a
+                      href={jim.url}
+                      target="_blank"
+                      className="w-full font-semibold line-clamp-1"
+                    >
+                      {jim.info.name || "Unknown Jim"}
+                    </a>
+                  </h2>
+                  <div className="flex flex-wrap gap-2 items-center mt-1">
+                    <span className="badge flex gap-2">
+                      <Wallet className="w-4" /> {jim.reserves.numApps}
+                    </span>
+                    <span className="badge flex gap-2">
+                      <Bitcoin className="w-4" />{" "}
+                      {Math.floor(jim.reserves.totalAppBalance / 1000)} sats
+                    </span>
+                    {jim.reserves.hasPublicChannels && (
+                      <span className="badge flex gap-2">
+                        <MicVocal className="w-4" />
+                        {"podcasting ok"}
+                      </span>
+                    )}
+                    {jim.reserves.totalAppBalance >
+                      jim.reserves.totalOutgoingCapacity && (
+                      <span className="badge flex gap-2">
+                        <SearchX className="w-4" />
+                        {"reserves unmet"}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <p
                 className={`text-sm cursor-pointer ${selectedJimUrl !== jim.url && "line-clamp-2"}`}
-                title={jim.info?.description}
+                title={jim.info.description}
                 onClick={() =>
                   setSelectedJimUrl((current) =>
                     current === jim.url ? undefined : jim.url,
                   )
                 }
               >
-                {jim.info?.description || "No description"}
+                {jim.info.description || "No description"}
               </p>
               {!store.isLoggedIn && (
                 <p className="text-xs">Login to see friend recommendations</p>

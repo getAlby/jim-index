@@ -35,10 +35,18 @@ type Jim = {
   eventId: string;
   event: NDKEvent;
   recommendedByUsers: { user: NDKUser; mutual: boolean }[];
-  info?: {
+  info: {
     name?: string;
     description?: string;
     image?: string;
+  };
+  reserves: {
+    numChannels: number;
+    totalOutgoingCapacity: number;
+    totalChannelCapacity: number;
+    numApps: number;
+    totalAppBalance: number;
+    hasPublicChannels: boolean;
   };
 };
 
@@ -93,11 +101,23 @@ async function loadJims() {
       let info: Jim["info"];
       try {
         const response = await fetch(new URL("/api/info", url));
-        if (response.ok) {
-          info = await response.json();
+        if (!response.ok) {
+          throw new Error("non-ok response");
         }
+        info = await response.json();
       } catch (error) {
         console.error("failed to fetch jim info", url, error);
+        continue;
+      }
+      let reserves: Jim["reserves"];
+      try {
+        const response = await fetch(new URL("/api/reserves", url));
+        if (!response.ok) {
+          throw new Error("non-ok response");
+        }
+        reserves = await response.json();
+      } catch (error) {
+        console.error("failed to fetch jim reserves", url, error);
         continue;
       }
 
@@ -107,10 +127,11 @@ async function loadJims() {
         recommendedByUsers: [],
         event,
         info,
+        reserves,
       });
+      useStore.getState().setJims(jims);
     }
   }
-  useStore.getState().setJims(jims);
 
   // load recommendations
 

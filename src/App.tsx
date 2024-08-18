@@ -186,17 +186,37 @@ export default function App() {
                     </a>
                   </h2>
                   <div className="flex flex-wrap gap-2 items-center mt-1">
-                    <span className="badge flex gap-2">
+                    <span
+                      className="badge flex gap-2"
+                      title={`${jim.reserves.numApps} hosted wallets with non-zero balances`}
+                    >
                       <Wallet className="w-4" /> {jim.reserves.numApps}
                     </span>
-                    <span className="badge flex gap-2">
+                    <span
+                      className="badge flex gap-2"
+                      title={
+                        Intl.NumberFormat().format(
+                          Math.floor(jim.reserves.totalAppBalance / 1000),
+                        ) + " sats on hosted wallets"
+                      }
+                    >
                       <Bitcoin className="w-4" />{" "}
                       {Intl.NumberFormat().format(
                         Math.floor(jim.reserves.totalAppBalance / 1000),
                       )}{" "}
                       sats
                     </span>
-                    <span className="badge flex gap-2">
+                    <span
+                      className="badge flex gap-2"
+                      title={
+                        Intl.NumberFormat().format(
+                          Math.floor(jim.reserves.totalChannelCapacity / 1000),
+                        ) +
+                        " sats capacity across " +
+                        jim.reserves.numChannels +
+                        " channels"
+                      }
+                    >
                       <Droplets className="w-4" />{" "}
                       {Intl.NumberFormat().format(
                         Math.floor(jim.reserves.totalChannelCapacity / 1000),
@@ -211,7 +231,18 @@ export default function App() {
                     )}
                     {jim.reserves.totalAppBalance >
                       jim.reserves.totalOutgoingCapacity && (
-                      <span className="badge flex gap-2">
+                      <span
+                        className="badge flex gap-2"
+                        title={
+                          Intl.NumberFormat().format(
+                            Math.floor(
+                              (jim.reserves.totalAppBalance -
+                                jim.reserves.totalOutgoingCapacity) /
+                                1000,
+                            ),
+                          ) + " sats uncounted for"
+                        }
+                      >
                         <SearchX className="w-4" />
                         {"reserves unmet"}
                       </span>

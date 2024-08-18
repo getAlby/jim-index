@@ -3,6 +3,7 @@ import { ndk, useStore } from "./store";
 import { JIM_INSTANCE_KIND } from "./types";
 import {
   Bitcoin,
+  Droplets,
   ExternalLink,
   MicVocal,
   Router,
@@ -190,7 +191,17 @@ export default function App() {
                     </span>
                     <span className="badge flex gap-2">
                       <Bitcoin className="w-4" />{" "}
-                      {Math.floor(jim.reserves.totalAppBalance / 1000)} sats
+                      {Intl.NumberFormat().format(
+                        Math.floor(jim.reserves.totalAppBalance / 1000),
+                      )}{" "}
+                      sats
+                    </span>
+                    <span className="badge flex gap-2">
+                      <Droplets className="w-4" />{" "}
+                      {Intl.NumberFormat().format(
+                        Math.floor(jim.reserves.totalChannelCapacity / 1000),
+                      )}{" "}
+                      sats
                     </span>
                     {jim.reserves.hasPublicChannels && (
                       <span className="badge flex gap-2">

@@ -1,5 +1,4 @@
 import { NDKEvent } from "@nostr-dev-kit/ndk";
-import jimLogo from "./assets/jim.svg";
 import { useStore } from "./store";
 import { JIM_INSTANCE_KIND } from "./types";
 
@@ -65,10 +64,10 @@ export default function App() {
   }
 
   return (
-    <div className="">
-      <div className="flex justify-between items-center p-4">
+    <div className="p-4">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <img src={jimLogo} className="w-6 h-6" />
+          <img src="/jim-index/jim-sm.png" className="w-12 h-12" />
           Jim Index
         </div>
         <div className="flex items-center justify-end gap-2">
@@ -81,27 +80,54 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="gap-4 grid grid-cols-1 md:flex">
         {store.jims.map((jim) => (
           <div key={jim.url} className="card bg-base-100 w-96 shadow-xl">
             <div className="card-body">
-              <h2 className="card-title">
-                <a
-                  href={jim.url}
-                  target="_blank"
-                  className="w-full link font-semibold"
-                >
+              <div className="flex items-center gap-2">
+                <div className="avatar">
+                  <div className="w-12 rounded-lg">
+                    <img
+                      src={
+                        jim.info?.image ||
+                        `https://api.dicebear.com/9.x/pixel-art/svg?seed=${jim.url}`
+                      }
+                    />
+                  </div>
+                </div>
+                <h2 className="card-title line-clamp-1">
+                  <a
+                    href={jim.url}
+                    target="_blank"
+                    className="w-full font-semibold line-clamp-1"
+                  >
+                    {jim.info?.name || "Unknown Jim"}
+                  </a>
+                </h2>
+              </div>
+              <p className="text-sm line-clamp-2" title={jim.info?.description}>
+                {jim.info?.description || "No description"}
+              </p>
+              <p>
+                <a href={jim.url} target="_blank" className="link">
                   {jim.url}
                 </a>
-              </h2>
+              </p>
               <p className="text-sm">
                 {jim.recommendedByUsers.length} recommendations (
                 {jim.recommendedByUsers.filter((r) => r.mutual).length} mutual)
               </p>
               <div className="card-actions justify-end mt-2">
+                <a
+                  href={jim.url}
+                  target="_blank"
+                  className="btn btn-primary btn-sm"
+                >
+                  Launch
+                </a>
                 <button
                   onClick={() => recommend(jim.eventId)}
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-secondary btn-sm"
                 >
                   Recommend
                 </button>

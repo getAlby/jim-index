@@ -30,6 +30,11 @@ type Jim = {
   url: string;
   eventId: string;
   recommendedByUsers: { user: NDKUser; mutual: boolean }[];
+  info?: {
+    name?: string;
+    description?: string;
+    image?: string;
+  };
 };
 
 type Store = {
@@ -87,6 +92,20 @@ export const useStore = create<Store>((set) => ({
       });
     }
   }
+  useStore.getState().setJims(jims);
+
+  // fetch jim info
+  for (const jim of jims) {
+    try {
+      const response = await fetch(new URL("/api/info", jim.url));
+      if (response.ok) {
+        jim.info = await response.json();
+      }
+    } catch (error) {
+      console.error("failed to fetch jim info", jim.url, error);
+    }
+  }
+
   useStore.getState().setJims(jims);
 
   // mutual recommendations

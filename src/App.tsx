@@ -2,9 +2,11 @@ import { getRelayListForUsers, NDKEvent } from "@nostr-dev-kit/ndk";
 import { ndk, useStore } from "./store";
 import { JIM_INSTANCE_KIND } from "./types";
 import { ExternalLink, Router, ThumbsUp } from "lucide-react";
+import React from "react";
 
 export default function App() {
   const store = useStore();
+  const [selectedJimUrl, setSelectedJimUrl] = React.useState<string>();
 
   async function login() {
     return store.login();
@@ -126,9 +128,32 @@ export default function App() {
         </div>
       </div>
 
-      <div className="gap-4 grid grid-cols-1 md:flex">
+      <div className="gap-4 grid grid-cols-1 md:grid-cols-3 mt-8">
+        {!store.jims.length &&
+          [...new Array(9)].map((_, index) => (
+            <div
+              key={index}
+              className="card bg-neutral-50/50 shadow-xl skeleton"
+            >
+              <div className="card-body">
+                <div className="flex items-center gap-2">
+                  <div className="avatar">
+                    <div className="w-12 bg-neutral-50 rounded-lg skeleton"></div>
+                  </div>
+                  <h2 className="card-title bg-neutral-50 skeleton w-48 h-8"></h2>
+                </div>
+                <p className={"text-sm w-64 h-16"}></p>
+
+                <div className="card-actions justify-end mt-2">
+                  <div className="rounded-lg bg-neutral-50 skeleton w-16 h-6"></div>
+                  <div className="rounded-lg bg-neutral-50 skeleton w-16 h-6"></div>
+                  <div className="rounded-lg bg-neutral-50 skeleton w-16 h-6"></div>
+                </div>
+              </div>
+            </div>
+          ))}
         {store.jims.map((jim) => (
-          <div key={jim.url} className="card bg-base-100 w-96 shadow-xl">
+          <div key={jim.url} className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <div className="flex items-center gap-2">
                 <div className="avatar">
@@ -151,7 +176,15 @@ export default function App() {
                   </a>
                 </h2>
               </div>
-              <p className="text-sm line-clamp-2" title={jim.info?.description}>
+              <p
+                className={`text-sm cursor-pointer ${selectedJimUrl !== jim.url && "line-clamp-2"}`}
+                title={jim.info?.description}
+                onClick={() =>
+                  setSelectedJimUrl((current) =>
+                    current === jim.url ? undefined : jim.url,
+                  )
+                }
+              >
                 {jim.info?.description || "No description"}
               </p>
               {!store.isLoggedIn && (

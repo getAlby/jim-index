@@ -119,7 +119,7 @@ export default function App() {
     <div className="p-4">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <img src="/jim-index/jim-sm.png" className="w-12 h-12" />
+          <img src="/jim-sm.png" className="w-12 h-12" />
           <span className="font-semibold">Uncle Jim Index</span>
         </div>
         <div className="flex items-center justify-end gap-2">

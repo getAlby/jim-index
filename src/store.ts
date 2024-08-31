@@ -4,6 +4,7 @@ import NDK, {
   NDKKind,
   NDKNip07Signer,
   NDKSigner,
+  NDKSubscription,
   NDKUser,
 } from "@nostr-dev-kit/ndk";
 import { create } from "zustand";
@@ -51,19 +52,48 @@ type Jim = {
 };
 
 type Store = {
+  readonly _jims: Partial<Jim>[];
   readonly jims: Jim[];
   readonly isLoggedIn: boolean;
   readonly hasLoaded: boolean;
-  setJims(jims: Jim[]): void;
+  updateJim(jim: Partial<Jim>): void;
   setLoaded(hasLoaded: boolean): void;
   login(): Promise<boolean>;
 };
 
 export const useStore = create<Store>((set, get) => ({
   isLoggedIn: false,
+  _jims: [],
   jims: [],
   hasLoaded: false,
-  setJims: (jims) => set({ jims }),
+  updateJim: (jim: Partial<Jim>) => {
+    const currentJims = get()._jims;
+    const currentJim: Partial<Jim> =
+      currentJims.find((current) => current.eventId === jim.eventId) || {};
+
+    const updatedJim: Partial<Jim> = {
+      ...currentJim,
+      ...jim,
+      recommendedByUsers: [
+        ...(currentJim.recommendedByUsers || []),
+        ...(jim.recommendedByUsers || []),
+      ].filter(
+        (v, i, a) =>
+          a.findIndex((current) => current.user.npub === v.user.npub) === i,
+      ),
+    };
+
+    const _jims = [
+      ...currentJims.filter((current) => current.eventId !== jim.eventId),
+      updatedJim,
+    ];
+    const jims = _jims.filter((jim) => !!jim.info) as Jim[];
+    jims.sort(
+      (a, b) => b.recommendedByUsers.length - a.recommendedByUsers.length,
+    );
+
+    set({ _jims, jims });
+  },
   setLoaded: (hasLoaded) => set({ hasLoaded }),
   login: async () => {
     if (get().isLoggedIn || !get().hasLoaded) {
@@ -83,19 +113,36 @@ export const useStore = create<Store>((set, get) => ({
 }));
 
 (async () => {
-  await ndk.connect();
+  console.log("Connecting to relays");
+  await ndk.connect(5000);
+  console.log("Loading Jims");
   await loadJims();
   useStore.getState().setLoaded(true);
 })();
 
+let jimInstanceEventsSub: NDKSubscription | undefined;
 async function loadJims() {
-  const jimInstanceEvents = await ndk.fetchEvents({
+  if (jimInstanceEventsSub) {
+    jimInstanceEventsSub.stop();
+  }
+  console.log("Fetching jim instance events");
+  jimInstanceEventsSub = ndk.subscribe({
     kinds: [JIM_INSTANCE_KIND as NDKKind],
   });
 
-  const jims: Jim[] = [];
-  console.log("jim instance events", jimInstanceEvents);
-  for (const event of jimInstanceEvents) {
+  jimInstanceEventsSub.on("event", async (event) => {
+    if (
+      useStore
+        .getState()
+        .jims.some((existing) => existing.eventId === event.id && existing.info)
+    ) {
+      // only update the event
+      useStore.getState().updateJim({
+        event,
+        eventId: event.id,
+      });
+    }
+
     const url = event.dTag;
     if (url && !url.endsWith("/")) {
       let info: Jim["info"];
@@ -107,7 +154,7 @@ async function loadJims() {
         info = await response.json();
       } catch (error) {
         console.error("failed to fetch jim info", url, error);
-        continue;
+        return;
       }
       let reserves: Jim["reserves"];
       try {
@@ -118,39 +165,39 @@ async function loadJims() {
         reserves = await response.json();
       } catch (error) {
         console.error("failed to fetch jim reserves", url, error);
-        continue;
+        return;
       }
 
-      jims.push({
+      const jim: Partial<Jim> = {
         eventId: event.id,
         url,
-        recommendedByUsers: [],
         event,
         info,
         reserves,
-      });
-      useStore.getState().setJims(jims);
+      };
+      useStore.getState().updateJim(jim);
     }
-  }
+  });
 
   // load recommendations
 
-  const jimRecommendationEvents = await ndk.fetchEvents({
+  const jimRecommendationSub = ndk.subscribe({
     kinds: [38000],
     "#k": [JIM_INSTANCE_KIND.toString()],
   });
 
-  console.log("jim recommendation events", jimRecommendationEvents);
-  for (const recommendationEvent of jimRecommendationEvents) {
-    const jim = jims.find((j) => j.eventId === recommendationEvent.dTag);
-    if (jim) {
-      jim.recommendedByUsers.push({
-        user: recommendationEvent.author,
-        mutual: false,
-      });
-    }
-  }
-  useStore.getState().setJims(jims);
+  jimRecommendationSub.on("event", (recommendationEvent: NDKEvent) => {
+    const jimEventId = recommendationEvent.dTag;
+    useStore.getState().updateJim({
+      eventId: jimEventId,
+      recommendedByUsers: [
+        {
+          user: recommendationEvent.author,
+          mutual: false,
+        },
+      ],
+    });
+  });
 }
 
 async function loadMutualRecommendations(signer: NDKSigner) {
@@ -170,10 +217,11 @@ async function loadMutualRecommendations(signer: NDKSigner) {
         await recommendedByUser.user.fetchProfile();
       }
     }
+    useStore.getState().updateJim({
+      eventId: jim.eventId,
+      recommendedByUsers: jim.recommendedByUsers,
+    });
   }
-  useStore.getState().setJims(jims);
-
-  // TODO: sort jims
 
   useStore.getState().setLoaded(true);
 }

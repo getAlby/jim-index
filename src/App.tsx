@@ -266,28 +266,30 @@ export default function App() {
               )}
               {store.isLoggedIn && (
                 <div className="flex flex-wrap gap-2">
-                  {jim.recommendedByUsers.map((user) => (
-                    <a
-                      key={user.user.pubkey}
-                      href={`https://nostrudel.ninja/#/u/${user.user.npub}`}
-                    >
-                      <div className="avatar">
-                        <div className="w-8 rounded-lg">
-                          <img
-                            title={
-                              user.user.profile?.displayName ||
-                              user.user.profile?.name ||
-                              user.user.npub
-                            }
-                            src={
-                              user.user.profile?.image ||
-                              `https://api.dicebear.com/9.x/pixel-art/svg?seed=${user.user.pubkey}`
-                            }
-                          />
+                  {jim.recommendedByUsers
+                    .filter((user) => user.mutual)
+                    .map((user) => (
+                      <a
+                        key={user.user.pubkey}
+                        href={`https://nostrudel.ninja/#/u/${user.user.npub}`}
+                      >
+                        <div className="avatar">
+                          <div className="w-8 rounded-lg">
+                            <img
+                              title={
+                                user.user.profile?.displayName ||
+                                user.user.profile?.name ||
+                                user.user.npub
+                              }
+                              src={
+                                user.user.profile?.image ||
+                                `https://api.dicebear.com/9.x/pixel-art/svg?seed=${user.user.pubkey}`
+                              }
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  ))}
+                      </a>
+                    ))}
                 </div>
               )}
 

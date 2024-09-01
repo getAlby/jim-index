@@ -88,8 +88,12 @@ export const useStore = create<Store>((set, get) => ({
       updatedJim,
     ];
     const jims = _jims.filter((jim) => !!jim.info) as Jim[];
+    const recommendedUsersFilter = (user: { mutual: boolean }) =>
+      !ndk.signer || user.mutual;
     jims.sort(
-      (a, b) => b.recommendedByUsers.length - a.recommendedByUsers.length,
+      (a, b) =>
+        b.recommendedByUsers.filter(recommendedUsersFilter).length -
+        a.recommendedByUsers.filter(recommendedUsersFilter).length,
     );
 
     set({ _jims, jims });
@@ -121,6 +125,7 @@ export const useStore = create<Store>((set, get) => ({
 })();
 
 let jimInstanceEventsSub: NDKSubscription | undefined;
+let jimRecommendationEventsSub: NDKSubscription | undefined;
 async function loadJims() {
   if (jimInstanceEventsSub) {
     jimInstanceEventsSub.stop();
@@ -141,6 +146,7 @@ async function loadJims() {
         event,
         eventId: event.id,
       });
+      return;
     }
 
     const url = event.dTag;
@@ -181,12 +187,15 @@ async function loadJims() {
 
   // load recommendations
 
-  const jimRecommendationSub = ndk.subscribe({
+  if (jimRecommendationEventsSub) {
+    jimRecommendationEventsSub.stop();
+  }
+  jimRecommendationEventsSub = ndk.subscribe({
     kinds: [38000],
     "#k": [JIM_INSTANCE_KIND.toString()],
   });
 
-  jimRecommendationSub.on("event", (recommendationEvent: NDKEvent) => {
+  jimRecommendationEventsSub.on("event", (recommendationEvent: NDKEvent) => {
     const jimEventId = recommendationEvent.dTag;
     useStore.getState().updateJim({
       eventId: jimEventId,
